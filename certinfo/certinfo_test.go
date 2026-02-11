@@ -3,6 +3,7 @@ package certinfo
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"strconv"
 	"testing"
 )
@@ -22,7 +23,7 @@ func TestGetBody(t *testing.T) {
 	var expected string
 	var getErr error
 
-	var daid string = "QCDEMO"
+	var daid = "QCDEMO"
 	var cid string
 
 	t.Run("Valid", func(t *testing.T) {
@@ -35,7 +36,7 @@ func TestGetBody(t *testing.T) {
 				t.Errorf("Unexpected error: %s", getErr)
 			}
 
-			content, readErr := os.ReadFile("testdata/QC-DEMO-" + cid + ".pem")
+			content, readErr := os.ReadFile(filepath.Join("testdata", "QC-DEMO-"+cid+".pem"))
 			if readErr != nil {
 				t.Errorf("Unexpected error: %s", readErr)
 			}
@@ -70,14 +71,14 @@ func TestGetBody(t *testing.T) {
 	})
 }
 
-func TestRetrieve(t *testing.T) {
-	var daid string = "QCDEMO"
+func TestReadFromURL(t *testing.T) {
+	var daid = "QCDEMO"
 	var info, expected CertInfo
 	var err error
 
 	retriever := NewRetriever()
 
-	info, err = retriever.Retrieve(daid, "1")
+	info, err = retriever.ReadFromURL(daid, "1")
 	if err != nil {
 		t.Errorf("Unexpected error: %s", err)
 	}
@@ -95,7 +96,7 @@ func TestRetrieve(t *testing.T) {
 		t.Errorf("The retrieved info does not match for DAID: %s, CID: 1.", daid)
 	}
 
-	info, err = retriever.Retrieve(daid, "2")
+	info, err = retriever.ReadFromURL(daid, "2")
 	if err != nil {
 		t.Errorf("Unexpected error: %s", err)
 	}
@@ -113,7 +114,7 @@ func TestRetrieve(t *testing.T) {
 		t.Errorf("The retrieved info does not match for DAID: %s, CID: 2.", daid)
 	}
 
-	info, err = retriever.Retrieve(daid, "3")
+	info, err = retriever.ReadFromURL(daid, "3")
 	if err != nil {
 		t.Errorf("Unexpected error: %s", err)
 	}
@@ -129,5 +130,74 @@ func TestRetrieve(t *testing.T) {
 
 	if info != expected {
 		t.Errorf("The retrieved info does not match for DAID: %s, CID: 3.", daid)
+	}
+}
+
+func TestReadFromFile(t *testing.T) {
+	var info, expected CertInfo
+	var err error
+	var directory = "testdata"
+	var filename, fullPath string
+
+	retriever := NewRetriever()
+
+	filename = "QC-DEMO-1.pem"
+	fullPath = filepath.Join(directory, filename)
+	info, err = retriever.ReadFromFile(fullPath)
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+	}
+
+	expected = CertInfo{
+		CID:       "Not available",
+		DAID:      "Not available",
+		Issuer:    "CN=QC DigSig Demo QC-DEMO https://www.idetrust.io 2026,O=QC DigSig Demo Inc.,L=Delmenhorst,C=DE",
+		Subject:   "CN=https://idetrust.com/daid/QC%20DEMO/cid/1,O=IDeTRUST GmbH,C=DE",
+		NotBefore: "2026-01-08 07:34:23",
+		NotAfter:  "2027-01-08 07:34:23",
+	}
+
+	if info != expected {
+		t.Errorf("The retrieved info does not match for this file: %s", fullPath)
+	}
+
+	filename = "QC-DEMO-2.pem"
+	fullPath = filepath.Join(directory, filename)
+	info, err = retriever.ReadFromFile(fullPath)
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+	}
+
+	expected = CertInfo{
+		CID:       "Not available",
+		DAID:      "Not available",
+		Issuer:    "CN=QC DigSig Demo QC-DEMO https://www.idetrust.io 2026,O=QC DigSig Demo Inc.,L=Delmenhorst,C=DE",
+		Subject:   "CN=https://idetrust.com/daid/QC%20DEMO/cid/2,O=IDeTRUST GmbH,C=DE",
+		NotBefore: "2026-01-09 06:55:35",
+		NotAfter:  "2027-01-09 06:55:35",
+	}
+
+	if info != expected {
+		t.Errorf("The retrieved info does not match for this file: %s", fullPath)
+	}
+
+	filename = "QC-DEMO-3.pem"
+	fullPath = filepath.Join(directory, filename)
+	info, err = retriever.ReadFromFile(fullPath)
+	if err != nil {
+		t.Errorf("Unexpected error: %s", err)
+	}
+
+	expected = CertInfo{
+		CID:       "Not available",
+		DAID:      "Not available",
+		Issuer:    "CN=QC DigSig Demo QC-DEMO https://www.idetrust.io 2026,O=QC DigSig Demo Inc.,L=Delmenhorst,C=DE",
+		Subject:   "CN=https://idetrust.com/daid/QC%20DEMO/cid/3,O=IDeTRUST GmbH,C=DE",
+		NotBefore: "2026-01-20 05:12:21",
+		NotAfter:  "2027-01-20 05:12:21",
+	}
+
+	if info != expected {
+		t.Errorf("The retrieved info does not match for this file: %s", fullPath)
 	}
 }

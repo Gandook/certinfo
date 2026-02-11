@@ -10,6 +10,7 @@ The project is split into a reusable library and a simple command-line wrapper.
 /
 ├── go.mod
 ├── /certinfo/           <-- The core, reusable library (package certinfo)
+    └── /testdata/       <-- The certificate files used for testing
 └── /cmd/
     └── /certinfo-cli/   <-- The command-line application (package main)
 ```
@@ -39,15 +40,26 @@ Use the `certinfo` command to see useful information about a certain DigSig X.50
 **Flags:**
 * `-daid <string>`: The certificate's DAID.
 * `-cid <string>`: The certificate's CID.
+* `-f <string>`: The path to the certificate file.
 
-**Example (Linux/macOS/PowerShell):**
+**Example: Giving a DAID and a CID (Linux/macOS/PowerShell):**
 ```shell
 ./certinfo-cli certinfo -daid QCDEMO -cid 3
 ```
 
-**Example (Windows Command Prompt):**
+**Example: Giving a DAID and a CID (Windows Command Prompt):**
 ```shell
 .\certinfo-cli.exe certinfo -daid QCDEMO -cid 3
+```
+
+**Example: Giving a file path (Linux/macOS/PowerShell):**
+```shell
+./certinfo-cli certinfo -f path/to/cert.pem
+```
+
+**Example: Giving a file path (Windows Command Prompt):**
+```shell
+.\certinfo-cli.exe certinfo -f path\to\cert.pem
 ```
 
 ### Running Tests

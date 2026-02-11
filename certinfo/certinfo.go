@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"time"
 )
@@ -29,10 +30,16 @@ type CertInfo struct {
 }
 
 type InfoRetriever interface {
-	// Retrieve retrieves the useful information about a DigSig X.509 certificate.
+	// ReadFromURL retrieves useful information about a DigSig X.509 certificate from
+	// a certain URL.
 	// daid is the certificate's DAID.
 	// cid is the certificate's CID.
-	Retrieve(daid string, cid string) (CertInfo, error)
+	ReadFromURL(daid string, cid string) (CertInfo, error)
+
+	// ReadFromFile retrieves useful information about a DigSig X.509 certificate from
+	// a certificate file.
+	// filename is the path to the certificate file.
+	ReadFromFile(filename string) (CertInfo, error)
 }
 
 // defaultInfoRetriever implements the InfoRetriever interface.
@@ -49,6 +56,12 @@ func NewRetriever() InfoRetriever {
 // cid is the certificate's CID.
 func constructURL(daid string, cid string) string {
 	return "https://idetrust.com/daid/" + daid + "/cid/" + cid
+}
+
+// readContent reads all the content from a reader and returns it as a string.
+func readContent(r io.Reader) (string, error) {
+	content, readErr := io.ReadAll(r)
+	return string(content), readErr
 }
 
 // getBody gets all the information from a certain url and returns it as a string.
@@ -68,22 +81,23 @@ func getBody(url string) (string, error) {
 		}
 	}(resp.Body)
 
-	body, readErr := io.ReadAll(resp.Body)
-
-	if string(body) == "Bad Request" {
+	if resp.StatusCode == http.StatusBadRequest {
 		return "", errBadRequest
 	}
-	if string(body) == "Not Found" {
+	if resp.StatusCode == http.StatusNotFound {
 		return "", errNotFound
 	}
 
-	return string(body), readErr
+	body, readErr := readContent(resp.Body)
+
+	return body, readErr
 }
 
-// Retrieve retrieves the useful information about a DigSig X.509 certificate.
+// ReadFromURL retrieves useful information about a DigSig X.509 certificate from
+// a certain URL.
 // daid is the certificate's DAID.
 // cid is the certificate's CID.
-func (d defaultInfoRetriever) Retrieve(daid string, cid string) (CertInfo, error) {
+func (d defaultInfoRetriever) ReadFromURL(daid string, cid string) (CertInfo, error) {
 	url := constructURL(daid, cid)
 
 	body, getErr := getBody(url)
@@ -91,9 +105,55 @@ func (d defaultInfoRetriever) Retrieve(daid string, cid string) (CertInfo, error
 		return CertInfo{}, getErr
 	}
 
-	subjectMatches := subjectPattern.FindAllStringSubmatch(body, 2)
-	notBeforeMatch := notBeforePattern.FindStringSubmatch(body)
-	notAfterMatch := notAfterPattern.FindStringSubmatch(body)
+	info, retrieveErr := retrieve(body)
+	if retrieveErr != nil {
+		return info, retrieveErr
+	}
+
+	info.CID = cid
+	info.DAID = daid
+
+	return info, nil
+}
+
+// ReadFromFile retrieves useful information about a DigSig X.509 certificate from
+// a certificate file.
+// filename is the path to the certificate file.
+func (d defaultInfoRetriever) ReadFromFile(filename string) (CertInfo, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return CertInfo{}, err
+	}
+	defer func(file *os.File) {
+		closingErr := file.Close()
+		if closingErr != nil {
+			log.Fatal(closingErr)
+		}
+	}(file)
+
+	content, readErr := io.ReadAll(file)
+	if readErr != nil {
+		return CertInfo{}, readErr
+	}
+
+	info, retrieveErr := retrieve(string(content))
+	if retrieveErr != nil {
+		return info, retrieveErr
+	}
+
+	info.CID = "Not available"
+	info.DAID = "Not available"
+
+	return info, nil
+}
+
+// retrieve retrieves the useful information about a DigSig X.509 certificate.
+// content contains the (leaf) certificate along with its corresponding intermediate and
+// root certificates.
+func retrieve(content string) (CertInfo, error) {
+	subjectMatches := subjectPattern.FindAllStringSubmatch(content, 2)
+	notBeforeMatch := notBeforePattern.FindStringSubmatch(content)
+	notAfterMatch := notAfterPattern.FindStringSubmatch(content)
 
 	issuer := subjectMatches[1][1]
 	subject := subjectMatches[0][1]
@@ -101,8 +161,8 @@ func (d defaultInfoRetriever) Retrieve(daid string, cid string) (CertInfo, error
 	notAfter := notAfterMatch[1] + " " + notAfterMatch[2]
 
 	return CertInfo{
-		CID:       cid,
-		DAID:      daid,
+		CID:       "", // It will be set in the ReadFromURL function.
+		DAID:      "", // It will be set in the ReadFromURL function.
 		Issuer:    issuer,
 		Subject:   subject,
 		NotBefore: notBefore,

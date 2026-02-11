@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -27,12 +28,33 @@ func runCertInfo(retriever certinfo.InfoRetriever, args []string) error {
 	command := flag.NewFlagSet("certinfo", flag.ExitOnError)
 	daid := command.String("daid", "", "The certificate's DAID")
 	cid := command.String("cid", "", "The certificate's CID")
+	filename := command.String("f", "", "The path to a file containing the certificates")
 	err := command.Parse(args)
 	if err != nil {
 		return err
 	}
 
-	info, retrieveErr := retriever.Retrieve(*daid, *cid)
+	var info certinfo.CertInfo
+	var retrieveErr error
+
+	if *filename != "" {
+		if *daid != "" || *cid != "" {
+			printUsageGuide()
+			return errors.New("if you want to retrieve information from a file, you should only use the '-f' flag")
+		}
+
+		info, retrieveErr = retriever.ReadFromFile(*filename)
+		if retrieveErr != nil {
+			return retrieveErr
+		}
+
+		return nil
+	} else if *daid == "" || *cid == "" {
+		printUsageGuide()
+		return errors.New("if you want to retrieve information from a URL, you need to give a DAID and a CID")
+	}
+
+	info, retrieveErr = retriever.ReadFromURL(*daid, *cid)
 	if retrieveErr != nil {
 		return retrieveErr
 	}
@@ -52,7 +74,7 @@ func main() {
 	retriever := certinfo.NewRetriever()
 
 	// Printing a usage guide if the command has too few arguments.
-	if len(os.Args) < 5 {
+	if len(os.Args) < 2 {
 		printUsageGuide()
 		os.Exit(1)
 	}
